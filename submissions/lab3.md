@@ -163,6 +163,32 @@ The numerator and denominator are each aggregated before division, so they have 
 
 During the short outage observation, the recorded availability value was still `1` and the burn rate was `0`. This is a real limitation of the sampled five-minute rule result at that instant, not an assertion that the ten 502 responses were successful. The SLO gauge therefore did not visibly change in the captured API result even though the gateway counter and request responses showed failures.
 
+### Controlled 60+ second outage evidence
+
+I repeated the test with payments stopped at `2026-09-20T17:52:30.7063841+03:00` and restarted it at `2026-09-20T17:55:08.1513465+03:00`. The outage therefore lasted about 157 seconds. During it, four batches of 20 real reserve-and-pay attempts were made; all 80 pay requests returned HTTP 502. Each later sampling command began after a 15-second wait, generated its batch, and then queried Prometheus. The service remained stopped for more than two scrape/evaluation cycles after failures had been sent.
+
+| Timestamp | Failed pay requests in batch | Availability rule | Burn-rate rule | Gateway error rate |
+|---|---:|---:|---:|---:|
+| 2026-09-20T17:52:54.4254627+03:00 | 20 × 502 | 0.7177307570555129 | 56.453848588897365 | 29.815432879307206% |
+| 2026-09-20T17:53:33.1959966+03:00 | 20 × 502 | 0.7019025391955993 | 59.619492160880085 | 30.20545285851825% |
+| 2026-09-20T17:54:12.6149562+03:00 | 20 × 502 | 0.6103629809085892 | 77.92740381828209 | 33.22928860603305% |
+| 2026-09-20T17:54:50.9370129+03:00 | 20 × 502 | 0.6773494168982447 | 64.53011662035101 | 33.43248305042335% |
+
+The first captured recording-rule result, at `17:52:54.4254627+03:00`, was already below 1. This made the SLO Availability gauge fall below 100%, and the burn rate was greater than zero at `56.453848588897365`. The lowest captured availability was `0.6103629809085892`, and the highest captured burn rate was `77.92740381828209`.
+
+Payments was then started again in its normal configuration. The post-recovery health checks were:
+
+```text
+PAYMENT_FAILURE_RATE=0.0
+PAYMENT_LATENCY_MS=0
+
+GET http://localhost:8082/health
+{"status":"healthy","failure_rate":0.0,"latency_ms":0}
+
+GET http://localhost:3080/health
+{"status":"healthy","checks":{"events":"ok","payments":"ok","circuit_payments":"CLOSED"}}
+```
+
 ## Bonus Failure Timeline
 
 For the separate bonus experiment, `payments` was recreated with `PAYMENT_FAILURE_RATE=0.5` and `PAYMENT_LATENCY_MS=1000`. Local control timestamps use `+03:00`; application log timestamps below are UTC.
