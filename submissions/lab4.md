@@ -205,4 +205,10 @@ POST /reserve/fae1d5d8-49dd-4de5-9eee-a580137cf4ec/pay -> 200
 
 ## Final State
 
-After Redis restoration, all five QuickTicket pods were `1/1 Running`; events Service again had endpoint `10.42.0.21:8081`. The final Helm release was `quickticket` in `deployed` state. Payments remained configured at failure rate `0.0` and latency `0`; gateway, events, and payments health checks were successful in the Helm critical-path verification.
+After Redis restoration, all five QuickTicket pods were `1/1 Running`; events Service again had endpoint `10.42.0.21:8081`. The final Helm release was `quickticket` in `deployed` state. A final three-service port-forward health check at `2026-09-21T02:29:57.0644636+03:00` returned:
+
+```text
+gateway  200 {"status":"healthy","checks":{"events":"ok","payments":"ok","circuit_payments":"CLOSED"}}
+events   200 {"status":"healthy","checks":{"postgres":"ok","redis":"ok"}}
+payments 200 {"status":"healthy","failure_rate":0.0,"latency_ms":0}
+```
