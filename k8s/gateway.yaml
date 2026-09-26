@@ -19,7 +19,7 @@ spec:
         - name: ghcr-secret
       containers:
         - name: gateway
-          image: ghcr.io/georgypyanov/quickticket-gateway:fd2b50100dbee5286b1a21397025d70fe50e85ae
+          image: ghcr.io/georgypyanov/quickticket-gateway:does-not-exist
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
