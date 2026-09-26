@@ -53,7 +53,7 @@ jobs:
               path = Path(f"k8s/{service}.yaml")
               text = path.read_text()
               text = re.sub(
-                  rf"image: .*quickticket-{service}:[^\\s]+",
+                  rf"image: .*quickticket-{service}:\S+",
                   f"image: ghcr.io/georgypyanov/quickticket-{service}:{sha}",
                   text,
               )
