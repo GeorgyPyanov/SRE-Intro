@@ -14,9 +14,7 @@ spec:
     spec:
       containers:
         - name: events
-          image: quickticket-events:v1
-          imagePullPolicy: Never
-          ports:
+          image: ghcr.io/georgypyanov/quickticket-events:2add944233cb83b707186981cfcb69fb197d8678s:
             - containerPort: 8081
           env:
             - name: DB_HOST

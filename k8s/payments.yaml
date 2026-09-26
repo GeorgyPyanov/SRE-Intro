@@ -14,9 +14,7 @@ spec:
     spec:
       containers:
         - name: payments
-          image: quickticket-payments:v1
-          imagePullPolicy: Never
-          ports:
+          image: ghcr.io/georgypyanov/quickticket-payments:2add944233cb83b707186981cfcb69fb197d8678s:
             - containerPort: 8082
           env:
             - name: PAYMENT_FAILURE_RATE

@@ -14,9 +14,7 @@ spec:
     spec:
       containers:
         - name: gateway
-          image: quickticket-gateway:v1
-          imagePullPolicy: Never
-          ports:
+          image: ghcr.io/georgypyanov/quickticket-gateway:2add944233cb83b707186981cfcb69fb197d8678s:
             - containerPort: 8080
           env:
             - name: EVENTS_URL
