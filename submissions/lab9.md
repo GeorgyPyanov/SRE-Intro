@@ -191,7 +191,15 @@ The inspector listed exactly five 245646-byte dumps, from manual-3 through manua
 
 ## Final recovery and GitOps state
 
-Mixedload will be removed before the final Argo CD sync. The old Lab 7 load generator is absent. Argo CD was pointed at `feature/lab9` and automation was temporarily disabled during manual data experiments; it will be restored to automated prune/self-heal after the branch is pushed and synchronized.
+Mixedload was removed before the final Argo CD sync, and the old Lab 7 load generator is absent. Argo CD was pointed at `feature/lab9` and automation was temporarily disabled during manual data experiments. It was restored after the branch was pushed:
+
+```text
+2026-10-04T19:31:37.5478543Z
+targetRevision=feature/lab9
+automated.prune=True, automated.selfHeal=True
+sync=Synced, health=Healthy
+revision=6c675c360bdafdb75511323b8fa58bba407e477a
+```
 
 Final direct health evidence before that sync:
 
@@ -201,6 +209,8 @@ gateway  HTTP 200  {"status":"healthy","checks":{"events":"ok","payments":"ok","
 events   HTTP 200  {"status":"healthy","checks":{"postgres":"ok","redis":"ok"}}
 payments HTTP 200  {"status":"healthy","failure_rate":0.0,"latency_ms":0}
 ```
+
+The final post-GitOps check at `2026-10-04T19:32:43.0196094Z` returned the same three HTTP 200 health responses, including `failure_rate: 0.0` and `latency_ms: 0`.
 
 ## Limitations and acceptance checklist
 
