@@ -14,8 +14,15 @@ spec:
     canary:
       steps:
         - setWeight: 20
-        - pause: {}
+        - pause:
+            duration: 60s
+        - setWeight: 40
+        - pause:
+            duration: 60s
         - setWeight: 60
+        - pause:
+            duration: 60s
+        - setWeight: 80
         - pause:
             duration: 30s
         - setWeight: 100
@@ -34,7 +41,7 @@ spec:
             - containerPort: 8080
           env:
             - name: APP_VERSION
-              value: v3-bad
+              value: v4-multistep
             - name: EVENTS_URL
               value: http://events:8081
             - name: PAYMENTS_URL
