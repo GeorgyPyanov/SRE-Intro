@@ -38,6 +38,25 @@ after: alembic current = 9a0002 (head)
 
 The resulting `events.email` column is `character varying(255)` and nullable. Prometheus returned `0` for the observed gateway 5xx-rate query immediately before the migration. The migration was run while mixedload was active and the complete checkout was successful afterwards. Adding a nullable column completed quickly here, but `ALTER TABLE` can still take a lock; this observation is not a guarantee of lock-free migrations.
 
+### Repeat measurement: post-migration 5xx
+
+The original report did not retain a post-migration 5xx sample, so I ran a separate, reversible measurement. A temporary in-cluster pod made 450 real `GET /events` requests through the gateway while the database was downgraded to `9a0001` and upgraded again to `9a0002`.
+
+```text
+repeat_migration_start_utc=2026-10-04T19:56:55.9453646Z  downgrade exit=0
+repeat_migration_upgrade_start_utc=2026-10-04T19:56:57.4483452Z  upgrade exit=0
+repeat_migration_end_utc=2026-10-04T19:56:58.9266326Z
+alembic current=9a0002 (head)
+traffic output: GET_events_200=450
+```
+
+After the traffic window, Prometheus returned this real post-migration result:
+
+```text
+post_repeat_migration_5xx_query_utc=2026-10-04T19:58:27.2917954Z
+sum(rate(gateway_requests_total{status=~"5.."}[1m])) = 0
+```
+
 ## Verified external backup
 
 Before destructive work I created a PostgreSQL custom-format dump inside the pod and copied it to `C:\Users\Я\AppData\Local\Temp`, outside the pod and outside this repository.
@@ -162,11 +181,29 @@ pay HTTP 200: order_id=6b15c5ef-9e40-470a-9763-18e07f1a9dd0, status=confirmed
 
 PVC storage made a pod restart recover without external restore. It does not replace backups and does not protect against loss of the PVC or node.
 
+### Repeat measurement: PVC recovery through checkout
+
+The first PVC test recorded database readiness and gateway health, but not a checkout immediately on that recovery path. I therefore repeated the PVC-backed pod deletion and measured through a confirmed order. The initial `kubectl exec` attempt landed while the replacement container was still being created; the recorded RTO includes that startup time and the required events pool restart.
+
+```text
+pvc_repeat_kill_utc=2026-10-04T19:59:08.1726237Z
+old_pod=postgres-749857fcc6-qjlhc
+orders_before=6509
+replacement_seen_utc=2026-10-04T19:59:08.3949824Z
+postgres_accepting_utc=2026-10-04T19:59:29.7047740Z
+events_pool_restart_start_utc=2026-10-04T19:59:29.7502085Z
+events_rollout_ready_utc=2026-10-04T19:59:38.9364964Z
+pvc_repeat_checkout_utc=2026-10-04T19:59:40.3027687Z
+RTO to successful checkout=32130.145 ms (32.130 s)
+```
+
+The reservation `74592da4-954d-4bd7-bf15-7726d9aa2623` for event 5 returned HTTP 200, followed by an HTTP 200 confirmed payment. The order count was 6510 after recovery, so the previously stored data remained present and the new order was written without restoring a dump.
+
 ## Bonus B — backup CronJob and retention
 
 The tracked `k8s/backup-cronjob.yaml` defines a `batch/v1` CronJob with `schedule: "*/5 * * * *"`, `concurrencyPolicy: Forbid`, `OnFailure`, and history limits of three completed and three failed Jobs. It writes a custom dump to a temporary file, renames it only after `pg_dump` succeeds, then removes only completed dumps beyond the newest five.
 
-The password is supplied by the non-tracked `postgres-backup-credentials` cluster Secret; no credential is in the manifest or report. The schedule was intentionally left `suspend: true` after the retention test so an automatic run cannot change the deterministic five-file result. The schedule itself remains configured and the template can be enabled for operations.
+The password is supplied by the non-tracked `postgres-backup-credentials` cluster Secret; no credential is in the manifest or report. After the retention test, the tracked CronJob was changed to `suspend: false` and reconciled by Argo CD.
 
 Seven sequential manual Jobs were created from the CronJob:
 
@@ -188,6 +225,28 @@ deleting /backups/quickticket_20261004T192355Z_lab9-backup-manual-2-m8hsm.dump
 ```
 
 The inspector listed exactly five 245646-byte dumps, from manual-3 through manual-7. `pg_restore --list` on `quickticket_20261004T192400Z_lab9-backup-manual-3-qrbjg.dump` reported a valid PostgreSQL 17.11 custom archive.
+
+### Scheduled backup verification
+
+Argo CD applied the enabled schedule at `2026-10-04T20:00:36.3463581Z`. The CronJob then created a non-manual Job; its owner was `CronJob/quickticket-backup`.
+
+```text
+suspend=false
+lastScheduleTime=2026-10-04T20:00:00Z
+lastSuccessfulTime=2026-10-04T20:00:37Z
+scheduled_job=quickticket-backup-29852400
+succeeded=1
+completion=2026-10-04T20:00:37Z
+```
+
+Its logs prove that it created a dump and maintained the five-dump retention target:
+
+```text
+created /backups/quickticket_20261004T200034Z_quickticket-backup-29852400-kzlfq.dump
+deleting /backups/quickticket_20261004T192400Z_lab9-backup-manual-3-qrbjg.dump
+```
+
+The inspector then reported `5` retained dump files.
 
 ## Final recovery and GitOps state
 
@@ -213,6 +272,8 @@ payments HTTP 200  {"status":"healthy","failure_rate":0.0,"latency_ms":0}
 The final post-GitOps check at `2026-10-04T19:32:43.0196094Z` returned the same three HTTP 200 health responses, including `failure_rate: 0.0` and `latency_ms: 0`.
 
 After that GitOps verification, the five-pod gateway Rollout remained available and one last checkout succeeded at `2026-10-04T19:33:55.5187013Z`: reservation `3c7aad5d-37c4-4a6e-9eed-e154b304b81f` for event 5 returned HTTP 200, and its payment confirmation returned HTTP 200.
+
+After these supplemental measurements, the final health check at `2026-10-04T20:02:22.3097890Z` returned HTTP 200 for gateway, events, and payments. Payments reported `failure_rate: 0.0` and `latency_ms: 0`; Argo CD was `Synced/Healthy` at revision `a07207840539559edbc421ba92ae50a37137f665`.
 
 ## Limitations and acceptance checklist
 
