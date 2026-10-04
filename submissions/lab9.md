@@ -212,6 +212,8 @@ payments HTTP 200  {"status":"healthy","failure_rate":0.0,"latency_ms":0}
 
 The final post-GitOps check at `2026-10-04T19:32:43.0196094Z` returned the same three HTTP 200 health responses, including `failure_rate: 0.0` and `latency_ms: 0`.
 
+After that GitOps verification, the five-pod gateway Rollout remained available and one last checkout succeeded at `2026-10-04T19:33:55.5187013Z`: reservation `3c7aad5d-37c4-4a6e-9eed-e154b304b81f` for event 5 returned HTTP 200, and its payment confirmation returned HTTP 200.
+
 ## Limitations and acceptance checklist
 
 - [x] Baseline, Alembic baseline stamp, nullable email migration, and downgrade-capable revision created.
