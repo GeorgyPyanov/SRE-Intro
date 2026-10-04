@@ -34,7 +34,7 @@ spec:
             - containerPort: 8080
           env:
             - name: APP_VERSION
-              value: v1-stable
+              value: v2-canary
             - name: EVENTS_URL
               value: http://events:8081
             - name: PAYMENTS_URL
