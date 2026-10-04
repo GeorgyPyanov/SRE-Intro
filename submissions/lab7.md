@@ -270,6 +270,26 @@ reservation_id=5249d48a-94a9-4662-9d3e-ea0ff010f6bc
 payment={"order_id":"5249d48a-94a9-4662-9d3e-ea0ff010f6bc","event_id":3,"quantity":1,"total_cents":15000,"status":"confirmed"}
 ```
 
+### Final state after request-rate evidence rollout
+
+The later request-rate evidence rollout replaced the historical recovery revision. The current desired Git state is `APP_VERSION=v7-request-rate-evidence`; it keeps the normal dependency URLs, timeout `5000`, and `/health` for both probes. The temporary load generator used for that last rollout was deleted after it reached Healthy.
+
+```text
+$ kubectl get rollout gateway -o jsonpath="app_version={.spec.template.spec.containers[0].env[0].value} phase={.status.phase} ready={.status.readyReplicas} available={.status.availableReplicas}"
+app_version=v7-request-rate-evidence phase=Healthy ready=5 available=5
+
+$ kubectl get application quickticket -n argocd -o jsonpath="sync={.status.sync.status} health={.status.health.status} revision={.status.sync.revision}"
+sync=Synced health=Healthy revision=293c54e6579b51be5b2281a755909ce71d2bb463
+
+$ kubectl get pods -l app=loadgen
+No resources found in default namespace.
+
+gateway_http_status=200
+gateway_body={"status":"healthy","checks":{"events":"ok","payments":"ok","circuit_payments":"CLOSED"}}
+events={"status":"healthy","checks":{"postgres":"ok","redis":"ok"}}
+payments={"status":"healthy","failure_rate":0.0,"latency_ms":0}
+```
+
 ## Acceptance Checklist
 
 - [x] Argo Rollouts controller and Windows plugin installed
