@@ -74,7 +74,7 @@ The Golden Signals dashboard has traffic, error, latency, dependency health, dat
    ```powershell
    kubectl get pods,svc
    kubectl get rollout gateway
-   kubectl logs deployment/gateway --since=10m
+   kubectl logs -l app=gateway --all-containers=true --since=10m --prefix=true
    kubectl logs deployment/events --since=10m
    kubectl logs deployment/payments --since=10m
    ```
