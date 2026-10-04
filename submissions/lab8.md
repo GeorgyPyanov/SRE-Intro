@@ -147,6 +147,14 @@ mixedload: No resources found in default namespace.
 Redis: 1/1 Running
 ~~~
 
+Final health responses were captured at `2026-10-04T19:04:59.7275807Z`:
+
+~~~
+gateway={"status":"healthy","checks":{"events":"ok","payments":"ok","circuit_payments":"CLOSED"}}
+events={"status":"healthy","checks":{"postgres":"ok","redis":"ok"}}
+payments={"status":"healthy","failure_rate":0.0,"latency_ms":0}
+~~~
+
 Final real checkout:
 
 ~~~
@@ -165,4 +173,3 @@ Prometheus remains running. The DB pool gauge was unavailable in the query resul
 - [x] Combined scenario observed for more than three minutes
 - [x] Confirmed weakness fixed and same Redis test repeated
 - [x] Argo CD, payments, dependencies, and load generators restored
-
