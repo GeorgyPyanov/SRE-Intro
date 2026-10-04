@@ -71,6 +71,139 @@ The strategy in the final manifest is 20%/60s, 40%/60s, 60%/60s, 80%/30s, then 1
 
 The in-cluster load generator remained active, so request traffic continued while Rollout changed ReplicaSet sizes. I would run an automated abort at the first 20% analysis stage: it limits blast radius to one pod while still providing enough traffic for a measurement.
 
+### Request-rate evidence during the new multi-step rollout
+
+The original early steps happened before the in-cluster Prometheus pod was started, so they cannot provide a retrospective rate. I therefore started one additional healthy revision (`v7-request-rate-evidence`) through Git and Argo CD, kept the supplied in-cluster load generator running, and queried Prometheus while the new revision was at three real canary stages. The query was `sum by (rs_hash) (rate(gateway_requests_total[30s]))`. `6456b98586` was stable and `55984f6bff` was the canary in this run.
+
+```text
+$ kubectl get rollout gateway -o jsonpath="phase={.status.phase} step={.status.currentStepIndex} canary={.status.updatedReplicas} stableRS={.status.stableRS} ready={.status.readyReplicas}"
+phase=Progressing step=2 canary=1 stableRS=6456b98586 ready=5
+
+timestamp_utc=2026-10-04T12:16:41.1052558Z
+promql=sum by (rs_hash) (rate(gateway_requests_total[30s]))
+rs_hash=6456b98586 rate_rps=7.960646458501719
+rs_hash=55984f6bff rate_rps=1.9602352282273872
+```
+
+```text
+$ Prometheus instant query at 2026-10-04T12:18:30Z
+promql=sum by (rs_hash) (rate(gateway_requests_total[30s]))
+rs_hash=6456b98586 rate_rps=6.720352020737362
+rs_hash=55984f6bff rate_rps=3.2247392473204095
+```
+
+```text
+timestamp_utc=2026-10-04T12:19:43.1295262Z
+$ kubectl get rollout gateway -o jsonpath="phase={.status.phase} step={.status.currentStepIndex} canary={.status.updatedReplicas} stableRS={.status.stableRS} ready={.status.readyReplicas}"
+phase=Paused step=6 canary=3 stableRS=6456b98586 ready=5
+promql=sum by (rs_hash) (rate(gateway_requests_total[30s]))
+rs_hash=6456b98586 rate_rps=4.080326426114089
+rs_hash=55984f6bff rate_rps=5.542615139397661
+```
+
+The first snapshot has one canary pod (20%), the second was taken during the two-canary-pod 40% pause, and the third has three canary pods (60%). The request rate moved towards the canary as its replica count increased; the variation is expected because the load generator creates independent requests and the values are 30-second rates.
+
+### Raw Rollout and AnalysisRun outputs
+
+The following command output was collected after the added healthy revision automatically promoted. It also shows that all earlier candidate ReplicaSets, including the manually aborted revision `gateway-779db4dd9b`, were scaled down.
+
+```text
+$ kubectl get rollout gateway -o wide
+NAME      DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+gateway   5         5         5            5           47m
+
+$ kubectl get rs -l app=gateway
+NAME                 DESIRED   CURRENT   READY   AGE
+gateway-55984f6bff   5         5         5       6m45s
+gateway-6456b98586   0         0         0       20m
+gateway-669f94f69d   0         0         0       47m
+gateway-69957fc8bb   0         0         0       24m
+gateway-74d8846df    0         0         0       34m
+gateway-779db4dd9b   0         0         0       40m
+gateway-7cff4c48b9   0         0         0       39m
+gateway-cbd89f6c8    0         0         0       44m
+```
+
+For the earlier manual abort, the actual Rollout status immediately after `kubectl argo rollouts abort gateway` was `Degraded`, message `RolloutAborted: Rollout aborted update to revision 3`, `ActualWeight: 0`, `Updated: 0`, and `Ready: 5`. The timestamped pod polling output in the Manual Abort section shows when the candidate disappeared and all five stable pods were Ready. The original manual promotion completed with `Status: Healthy`, `Step: 5/5`, `ActualWeight: 100`, and five Ready pods.
+
+```text
+$ kubectl get analysisrun -o wide
+NAME                      STATUS       AGE
+gateway-55984f6bff-8-2    Successful   5m36s
+gateway-6456b98586-7-2    Successful   19m
+gateway-69957fc8bb-6-2    Failed       23m
+gateway-74d8846df-5-2     Failed       33m
+gateway-74d8846df-5-2.1   Successful   30m
+```
+
+The relevant failed-run YAML below is raw output for the automatic bad-canary abort. It records the latest canary hash, the resolved Prometheus query, the two failed measurements, and the controller's failure message.
+
+```yaml
+$ kubectl get analysisrun gateway-69957fc8bb-6-2 -o yaml
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisRun
+metadata:
+  annotations:
+    rollout.argoproj.io/revision: "6"
+  creationTimestamp: "2026-10-04T11:58:37Z"
+  generation: 4
+  labels:
+    app: gateway
+    rollout-type: Step
+    rollouts-pod-template-hash: 69957fc8bb
+    step-index: "2"
+  name: gateway-69957fc8bb-6-2
+  namespace: default
+spec:
+  args:
+  - name: canary-hash
+    value: 69957fc8bb
+  metrics:
+  - count: 3
+    failureLimit: 1
+    initialDelay: 60s
+    interval: 20s
+    name: error-rate
+    provider:
+      prometheus:
+        address: http://prometheus.monitoring.svc.cluster.local:9090
+        query: |
+          (
+            sum(rate(gateway_requests_total{rs_hash="{{args.canary-hash}}",status=~"5.."}[60s]))
+            or on() vector(0)
+          )
+          /
+          sum(rate(gateway_requests_total{rs_hash="{{args.canary-hash}}"}[60s]))
+    successCondition: result[0] < 0.05
+status:
+  completedAt: "2026-10-04T11:59:57Z"
+  message: Metric "error-rate" assessed Failed due to failed (2) > failureLimit (1)
+  metricResults:
+  - count: 2
+    failed: 2
+    measurements:
+    - finishedAt: "2026-10-04T11:59:37Z"
+      phase: Failed
+      startedAt: "2026-10-04T11:59:37Z"
+      value: '[1]'
+    - finishedAt: "2026-10-04T11:59:57Z"
+      phase: Failed
+      startedAt: "2026-10-04T11:59:57Z"
+      value: '[1]'
+    metadata:
+      ResolvedPrometheusQuery: |
+        (
+          sum(rate(gateway_requests_total{rs_hash="69957fc8bb",status=~"5.."}[60s]))
+          or on() vector(0)
+        )
+        /
+        sum(rate(gateway_requests_total{rs_hash="69957fc8bb"}[60s]))
+    name: error-rate
+    phase: Failed
+  phase: Failed
+  startedAt: "2026-10-04T11:58:37Z"
+```
+
 ## Prometheus Analysis Bonus
 
 The supplied `labs/lab7/prometheus.yaml` and `analysis-template.yaml` were applied. In-cluster Prometheus was Running and discovered each gateway pod with the relabeled `rs_hash`:
