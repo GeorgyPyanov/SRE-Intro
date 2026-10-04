@@ -1,15 +1,24 @@
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
 metadata:
   name: gateway
   labels:
     app: gateway
     version: "v2"
 spec:
-  replicas: 1
+  replicas: 5
   selector:
     matchLabels:
       app: gateway
+  strategy:
+    canary:
+      steps:
+        - setWeight: 20
+        - pause: {}
+        - setWeight: 60
+        - pause:
+            duration: 30s
+        - setWeight: 100
   template:
     metadata:
       labels:
@@ -24,6 +33,8 @@ spec:
           ports:
             - containerPort: 8080
           env:
+            - name: APP_VERSION
+              value: v1-stable
             - name: EVENTS_URL
               value: http://events:8081
             - name: PAYMENTS_URL
