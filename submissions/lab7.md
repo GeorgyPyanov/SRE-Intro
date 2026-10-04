@@ -126,7 +126,16 @@ Beyond error rate, latency p95 and dependency-health availability would make the
 
 ## Recovery
 
-Git was restored to `APP_VERSION=v7-recovered`, `EVENTS_URL=http://events:8081`, `PAYMENTS_URL=http://payments:8082`, timeout 5000, and `/health` for both probes. The final validation keeps the multi-step strategy and AnalysisTemplate. The supplied load generator will be removed after final health verification; in-cluster Prometheus remains for Lab 8.
+Git was restored to `APP_VERSION=v7-recovered`, `EVENTS_URL=http://events:8081`, `PAYMENTS_URL=http://payments:8082`, timeout 5000, and `/health` for both probes. The recovery AnalysisRun `gateway-6456b98586-7-2` completed Successfully at `2026-10-04T12:04:23Z` with three `[0]` measurements. It was then fully promoted; the Rollout was Healthy at ActualWeight 100 with exactly five Ready gateway pods, and Argo CD was `Synced Healthy` at revision `c0f161e066c70c7192de7eddd798eb59915d732f`.
+
+The load generator was deleted. In-cluster Prometheus remains Running for Lab 8. Final gateway checks through a temporary port-forward were real:
+
+```text
+health={"status":"healthy","checks":{"events":"ok","payments":"ok","circuit_payments":"CLOSED"}}
+events_count=5
+reservation_id=5249d48a-94a9-4662-9d3e-ea0ff010f6bc
+payment={"order_id":"5249d48a-94a9-4662-9d3e-ea0ff010f6bc","event_id":3,"quantity":1,"total_cents":15000,"status":"confirmed"}
+```
 
 ## Acceptance Checklist
 
