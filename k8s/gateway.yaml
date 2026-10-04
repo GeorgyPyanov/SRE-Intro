@@ -48,7 +48,7 @@ spec:
             - containerPort: 8080
           env:
             - name: APP_VERSION
-              value: v7-recovered
+              value: v7-request-rate-evidence
             - name: EVENTS_URL
               value: http://events:8081
             - name: PAYMENTS_URL
