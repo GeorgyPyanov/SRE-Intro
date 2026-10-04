@@ -16,6 +16,13 @@ spec:
         - setWeight: 20
         - pause:
             duration: 60s
+        - analysis:
+            templates:
+              - templateName: gateway-error-rate
+            args:
+              - name: canary-hash
+                valueFrom:
+                  podTemplateHashValue: Latest
         - setWeight: 40
         - pause:
             duration: 60s
@@ -41,7 +48,7 @@ spec:
             - containerPort: 8080
           env:
             - name: APP_VERSION
-              value: v4-multistep
+              value: v5-analysis-good
             - name: EVENTS_URL
               value: http://events:8081
             - name: PAYMENTS_URL
