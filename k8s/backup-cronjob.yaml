@@ -4,9 +4,8 @@ metadata:
   name: quickticket-backup
 spec:
   schedule: "*/5 * * * *"
-  # Kept suspended after the retention exercise. Manual Jobs use this template
-  # and avoid scheduled backups affecting the deterministic five-file check.
-  suspend: true
+  # Scheduled backups are enabled after the retention exercise.
+  suspend: false
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 3
