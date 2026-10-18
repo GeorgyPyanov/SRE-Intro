@@ -38,12 +38,26 @@ spec:
       labels:
         app: gateway
     spec:
+      terminationGracePeriodSeconds: 40
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: gateway
       imagePullSecrets:
         - name: ghcr-secret
       containers:
         - name: gateway
           image: quickticket-gateway:lab11
           imagePullPolicy: Never
+          command: ["uvicorn"]
+          args: ["main:app", "--host", "0.0.0.0", "--port", "8080", "--timeout-graceful-shutdown", "25"]
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sh", "-c", "sleep 10"]
           ports:
             - containerPort: 8080
           env:
@@ -82,10 +96,10 @@ spec:
             failureThreshold: 3
           readinessProbe:
             httpGet:
-              path: /metrics
+              path: /health
               port: 8080
-            periodSeconds: 5
-            failureThreshold: 2
+            periodSeconds: 2
+            failureThreshold: 1
           resources:
             requests:
               cpu: 50m
