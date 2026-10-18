@@ -11,6 +11,9 @@ import httpx
 spec = importlib.util.spec_from_file_location("gateway_lab11", Path(__file__).resolve().parents[1] / "app/gateway/main.py")
 gateway = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(gateway)
+notify_spec = importlib.util.spec_from_file_location("notifications_lab11", Path(__file__).resolve().parents[1] / "app/notifications/main.py")
+notifications = importlib.util.module_from_spec(notify_spec)
+notify_spec.loader.exec_module(notifications)
 
 
 def http_error(status):
@@ -169,6 +172,37 @@ class PatternTests(unittest.IsolatedAsyncioTestCase):
             with self.assertLogs("gateway", "WARNING") as logs:
                 await gateway._notify_order_confirmed("test-order")
             self.assertIn("500", logs.output[0])
+
+    async def test_notifications_http_contract_and_fault_metrics(self):
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=notifications.app), base_url="http://notifications") as client:
+            before = notifications.NOTIFY_TOTAL.labels("failed")._value.get()
+            with patch.object(notifications, "NOTIFY_FAILURE_RATE", 1.0):
+                failed = await client.post("/notify", json={"event": "order_confirmed", "order_id": "test"})
+                self.assertEqual(failed.status_code, 500)
+                self.assertEqual(notifications.NOTIFY_TOTAL.labels("failed")._value.get() - before, 1)
+            with patch.object(notifications, "NOTIFY_FAILURE_RATE", 0.0):
+                success = await client.post("/notify", json={"event": "order_confirmed", "order_id": "test"})
+                self.assertEqual(success.json()["status"], "sent")
+                health = await client.get("/health")
+                self.assertEqual(health.status_code, 200)
+                metrics = (await client.get("/metrics")).text
+                self.assertIn("notifications_notify_total", metrics)
+                self.assertIn("notifications_request_duration_seconds_bucket", metrics)
+                self.assertIn('notifications_requests_total{method="POST",path="/notify",status="500"}', metrics)
+
+    async def test_rate_limit_exempts_metrics_and_health(self):
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=gateway.app), base_url="http://gateway") as client:
+            # Stub dependencies, but exercise actual middleware and response headers.
+            class Dependencies:
+                async def get(self, url, **kwargs):
+                    return httpx.Response(200, json=[], request=httpx.Request("GET", url))
+            with patch.object(gateway, "rate_limiter", gateway.RateLimiter(1)), patch.object(gateway, "client", Dependencies()):
+                self.assertEqual((await client.get("/events")).status_code, 200)
+                rejected = await client.get("/events")
+                self.assertEqual(rejected.status_code, 429)
+                self.assertEqual(rejected.headers["retry-after"], "1")
+                self.assertEqual((await client.get("/metrics")).status_code, 200)
+                self.assertEqual((await client.get("/health")).status_code, 200)
 
 
 if __name__ == "__main__":
