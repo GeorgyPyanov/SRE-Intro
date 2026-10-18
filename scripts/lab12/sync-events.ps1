@@ -7,8 +7,9 @@ $app | Add-Member -Name operation -MemberType NoteProperty -Value @{sync=@{revis
 $app | ConvertTo-Json -Depth 100 | kubectl replace -f -
 $deadline=[DateTime]::UtcNow.AddSeconds(120)
 do {
+    $liveApp=kubectl get application quickticket -n argocd -o json | ConvertFrom-Json
     $deployment=kubectl get deployment events -o json | ConvertFrom-Json
-    if ($deployment.spec.template.spec.containers[0].image -eq $Image) { break }
+    if ($liveApp.status.operationState.phase -eq 'Succeeded' -and $liveApp.status.operationState.syncResult.revision -eq $revision -and $deployment.spec.template.spec.containers[0].image -eq $Image) { break }
     Start-Sleep -Seconds 1
 } while ([DateTime]::UtcNow -lt $deadline)
 if ($deployment.spec.template.spec.containers[0].image -ne $Image) { throw 'Git revision not deployed' }
