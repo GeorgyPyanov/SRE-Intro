@@ -12,12 +12,19 @@ spec:
       labels:
         app: events
     spec:
+      terminationGracePeriodSeconds: 40
       imagePullSecrets:
         - name: ghcr-secret
       containers:
         - name: events
           image: quickticket-events:lab12-b-a0bc4751a840
           imagePullPolicy: Never
+          command: ["uvicorn"]
+          args: ["main:app", "--host", "0.0.0.0", "--port", "8081", "--timeout-graceful-shutdown", "25"]
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sh", "-c", "sleep 10"]
           ports:
             - containerPort: 8081
           env:
