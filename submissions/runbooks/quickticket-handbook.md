@@ -103,3 +103,5 @@ Before any restore:
 For the Lab 9 recovery procedure, copy the validated dump into the PostgreSQL pod and run `pg_restore --clean --if-exists` against `quickticket`. If PostgreSQL was replaced, wait for `pg_isready`; restart Events only when its existing connection pool cannot reconnect. Then confirm the Alembic revision, tables/counts appropriate to the snapshot, service health, and a complete checkout.
 
 The `postgres-data` PVC preserves the database across an ordinary PostgreSQL pod restart and avoided a restore in the Lab 9 PVC drill. It is not a backup: it does not protect against PVC/node loss, corruption, or a destructive SQL change. Scheduled verified dumps and restore drills cover those separate failure modes.
+
+After Lab 12, use the [schema compatibility and recovery supplement](lab12-schema-recovery.md): the current Events application and fresh seed use `scheduled_at`, while historical Lab 9 dumps use `event_date`. Restore and application versions must be coordinated; the old upgrade chain must not be run blindly against the new seed schema.
