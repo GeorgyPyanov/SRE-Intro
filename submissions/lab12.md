@@ -447,11 +447,11 @@ index 55a1966..91f63e2 100644
 +    price_cents INT NOT NULL,
 +    email VARCHAR(255)
  );
- 
+
  CREATE TABLE IF NOT EXISTS orders (
 @@ -20,7 +21,9 @@ CREATE TABLE IF NOT EXISTS orders (
  );
- 
+
  -- Seed events
 -INSERT INTO events (name, venue, event_date, total_tickets, price_cents) VALUES
 +CREATE INDEX IF NOT EXISTS idx_events_scheduled_at ON events(scheduled_at);
@@ -734,6 +734,38 @@ the manifest overrides Uvicorn's command. Existing Lab 11 tests were rerun:
 wrong paths and failed import; the corrected /repo/app and /repo/tests mounts
 passed, without changing tests.
 
+Final post-cleanup recheck at **2026-10-18T22:43:10.751545Z**, executed from
+an existing gateway pod (no new probe resources):
+
+```json
+[{"service":"gateway","status":200,"body":{"status":"healthy","checks":{"events":"ok","payments":"ok","notifications":"ok","circuit_payments":"CLOSED"}}},{"service":"events","status":200,"body":{"status":"healthy","checks":{"postgres":"ok","redis":"ok"}}},{"service":"payments","status":200,"body":{"status":"healthy","failure_rate":0.0,"latency_ms":0}},{"service":"notifications","status":200,"body":{"status":"healthy","failure_rate":0.0,"latency_ms":0}}]
+```
+
+Both running Events pods returned the actual `/app/main.py` SHA256
+`a0bc4751a840bc5d57f8941e7207a177f1f45698da4d4b21ee1b65c87086dc12`, matching
+Deploy B. At 22:43:11.6176319Z ArgoCD was Synced/Healthy at report commit
+`ca90b9f7549c3d91f1c976e7b48d7fcc661b0984`, target feature/lab12,
+prune/selfHeal true. The selector for lab12-client/lab12-compat/mixedload/loadgen
+returned `No resources found in default namespace.`
+
+## Submission
+
+All commits were pushed to the fork's `feature/lab12`. GitHub CLI is absent.
+Creating the upstream PR through the connected GitHub integration returned
+HTTP 403: `Resource not accessible by integration` (pulls/create API).
+This is a PR-creation permission blocker, not a branch-push failure.
+
+Create the PR manually using this
+[compare link](https://github.com/inno-devops-labs/SRE-Intro/compare/main...GeorgyPyanov:SRE-Intro:feature/lab12?expand=1).
+Title: **Lab 12: Advanced Kubernetes Resilience**.
+
+```markdown
+- [x] Task 1: multi-replica failover, four PDBs, topology spread, real eviction rejection
+- [x] Task 2: graceful Rollout restart and concurrent index migration
+- [x] Bonus: five staged expand-and-contract transitions, with failed first run retained and successful full repeat
+- [ ] Optional HPA observation: not attempted
+```
+
 ## Acceptance checklist
 
 - [x] Two Events/Payments/Notifications replicas, five gateway replicas; connection/resource budget checked.
@@ -748,4 +780,3 @@ passed, without changing tests.
 - [x] Isolated legacy upgrade/downgrade and complete fresh-schema comparison before stamp.
 - [x] Final checkout/notification, healthy replicas, fault settings, PVCs, backups, Prometheus and GitOps automation restored; temporary resources removed.
 - [ ] Optional HPA observation — not attempted.
-
