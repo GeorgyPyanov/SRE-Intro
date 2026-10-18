@@ -13,6 +13,7 @@ do {
     Start-Sleep -Seconds 1
 } while ([DateTime]::UtcNow -lt $deadline)
 if ($deployment.spec.template.spec.containers[0].image -ne $Image) { throw 'Git revision not deployed' }
+if ($liveApp.status.operationState.phase -ne 'Succeeded' -or $liveApp.status.operationState.syncResult.revision -ne $revision) { throw 'GitOps sync did not succeed; inspect Application operationState' }
 kubectl rollout status deployment/events --timeout=120s
 if ($LASTEXITCODE) { throw 'Events rollout failed' }
 do {

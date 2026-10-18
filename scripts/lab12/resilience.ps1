@@ -2,6 +2,7 @@ param([ValidateSet('failover','restart')][string]$Experiment, [string]$WindowNam
 $ErrorActionPreference='Stop'
 $localData=[Environment]::GetFolderPath('LocalApplicationData')
 $evidence=Join-Path $localData 'Temp\sre-lab12-evidence'
+if (-not (Test-Path -LiteralPath $evidence)) { New-Item -ItemType Directory -Path $evidence | Out-Null }
 $logProcesses=@()
 if (-not $WindowName) { $WindowName=$Experiment }
 $old=@((kubectl get pods -l app=gateway -o json | ConvertFrom-Json).items |
@@ -46,7 +47,7 @@ try {
     if ($readyGateway.Count -eq 5 -and $readyEvents.Count -eq 2 -and $allReplaced) { break }
     Start-Sleep -Seconds 1
   } while ([DateTime]::UtcNow -lt $deadline)
-  if ($readyGateway.Count -ne 5 -or -not $allReplaced) { throw 'Recovery deadline exceeded' }
+  if ($readyGateway.Count -ne 5 -or $readyEvents.Count -ne 2 -or -not $allReplaced) { throw 'Recovery deadline exceeded' }
   [pscustomobject]@{kind='recovered';timestamp=[DateTime]::UtcNow.ToString('o');elapsed_s=[Math]::Round($timer.Elapsed.TotalSeconds,3);gatewayReady=$readyGateway.Count;eventsReady=$readyEvents.Count} | ConvertTo-Json -Compress
   Start-Sleep -Seconds 10
 } finally {
