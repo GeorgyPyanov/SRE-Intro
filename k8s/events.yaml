@@ -17,7 +17,7 @@ spec:
         - name: ghcr-secret
       containers:
         - name: events
-          image: quickticket-events:lab12-a-4f0dd1dfda5e
+          image: quickticket-events:lab12-b-a0bc4751a840
           imagePullPolicy: Never
           command: ["uvicorn"]
           args: ["main:app", "--host", "0.0.0.0", "--port", "8081", "--timeout-graceful-shutdown", "25"]
